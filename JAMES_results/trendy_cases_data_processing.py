@@ -3,6 +3,7 @@ import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
 import argparse
+import re
 
 # List of variables to process
 variable_names = [
@@ -26,7 +27,15 @@ if args.dir:
         raise ValueError(f"Specified directory {args.dir} does not exist or is not a directory.")
     folders = [args.dir]
 else:
-    folders = [f for f in os.listdir('.') if os.path.isdir(f) and f.startswith('run')]
+    # Pattern for folders like 185580.250727-21010_results
+    folder_pattern = re.compile(r"^\d+\.\d+-\d+_results$")
+    candidate_folders = [f for f in os.listdir('.') if os.path.isdir(f) and folder_pattern.match(f)]
+    if not candidate_folders:
+        raise ValueError("No folders matching the pattern 'number.number-number_results' found in the current directory.")
+    # Select the latest by modification time
+    latest_folder = max(candidate_folders, key=lambda f: os.path.getmtime(f))
+    folders = [latest_folder]
+    print(f"Processing only the latest folder: {latest_folder}")
 
 for folder in folders:
     folder_path = os.path.join('.', folder)

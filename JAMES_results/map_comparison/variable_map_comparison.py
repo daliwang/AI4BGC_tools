@@ -10,8 +10,8 @@ import argparse
 import glob
 
 
-#variables = ['CWDC', 'DEADSTEMC', 'GPP', 'HR', 'NEE', 'SOIL1C', 'SOIL2C', 'SOIL3C', 'SOIL4C', 'TLAI', 'TOTCOLC', 'TOTSOMC']
-variables = ['GPP']
+variables = ['CWDC', 'DEADSTEMC', 'GPP', 'HR', 'NEE', 'SOIL1C', 'SOIL2C', 'SOIL3C', 'SOIL4C', 'TLAI', 'TOTCOLC', 'TOTSOMC']
+#variables = ['GPP']
 
 def get_latest_file(pattern):
     files = glob.glob(pattern)
@@ -110,7 +110,7 @@ def main():
     parser.add_argument('--latest', type=str, default=None, help='Path to the latest result NetCDF file (file 1).')
     parser.add_argument('--previous', type=str, default=None, help='Path to a previous result NetCDF file (file 2).')
     parser.add_argument('--model', type=str, default='model_780_h0_results.nc', help='Path to the model reference NetCDF file.')
-    parser.add_argument('--search_pattern', type=str, default='../*.nc', help='Glob pattern to search for NetCDF files.')
+    parser.add_argument('--search_pattern', type=str, default='./*.nc', help='Glob pattern to search for NetCDF files.')
     args = parser.parse_args()
 
     # Find latest file if not provided
