@@ -41,16 +41,13 @@ for folder in folders:
     folder_path = os.path.join('.', folder)
     out_folder = os.path.join(output_root, folder)
     os.makedirs(out_folder, exist_ok=True)
-    # Choose file pattern based on folder name
-    if 'model' in folder:
-        file_prefix = "20250117_trendytest_ICB1850CNPRDCTCBC.elm.h0."
-    else:
-        file_prefix = "20250408_trendytest_ICB1850CNPRDCTCBC.elm.h0."
-    # Find all NetCDF files matching the pattern in this folder
-    all_files = [f for f in os.listdir(folder_path)
-                 if f.startswith(file_prefix) and f.endswith(".nc")]
+    # Collect all NetCDF files that look like ELM monthly outputs
+    all_files = [
+        f for f in os.listdir(folder_path)
+        if f.endswith(".nc") and ".elm.h0." in f
+    ]
     if not all_files:
-        print(f"No NetCDF files found in {folder_path}.")
+        print(f"No NetCDF files found in {folder_path} matching pattern '*.elm.h0.*.nc'.")
         continue
     for variable_name in variable_names:
         twenty_year_sums = {}

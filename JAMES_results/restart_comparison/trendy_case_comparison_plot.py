@@ -9,6 +9,7 @@
 
 import os
 import re, tarfile
+import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -16,23 +17,25 @@ import matplotlib.pyplot as plt
 restart_comparison_path = "/gpfs/wolf2/cades/cli185/proj-shared/wangd/AI_data/JAMES_results/restart_comparison"
 
 # get all the folders in the restart_comparison_path
-reference_folders = ["run_updated9_cnp", "run_model", "run_780", "run3_cnp"]
+reference_folders = ["run_updated9_cnp", "run_model", "run_780"]
 all_folders = [f for f in os.listdir(restart_comparison_path) if os.path.isdir(os.path.join(restart_comparison_path, f))]
 
-# Exclude reference folders to find candidate result folders
-candidate_folders = [f for f in all_folders if f not in reference_folders]
-if not candidate_folders:
-    raise RuntimeError("No candidate result folders found in restart_comparison_path.")
+# Require the user to explicitly provide the evaluate case via CLI
+parser = argparse.ArgumentParser(description="Compare an explicit evaluate case against reference folders.")
+parser.add_argument("--eval-case", "--case", dest="eval_case", required=True,
+                    help="Name of the evaluate case folder under the restart_comparison path.")
+args = parser.parse_args()
 
-# Find the latest folder by modification time
-latest_folder = max(
-    candidate_folders,
-    key=lambda f: os.path.getmtime(os.path.join(restart_comparison_path, f))
-)
+eval_case = args.eval_case
 
-# Set folders to compare: latest + references
-folders = [latest_folder] + reference_folders
-print(f"Comparing latest folder '{latest_folder}' with reference folders: {reference_folders}")
+# Validate that the evaluate case exists
+if eval_case not in all_folders:
+    available = ", ".join(sorted(all_folders))
+    raise RuntimeError(f"Evaluate case '{eval_case}' not found in '{restart_comparison_path}'. Available folders: {available}")
+
+# Set folders to compare: provided eval case + references
+folders = [eval_case] + reference_folders
+print(f"Comparing evaluate case '{eval_case}' with reference folders: {reference_folders}")
 
 # Step 1: Collect all unique variable names from files in all folders
 variable_set = set()
@@ -75,16 +78,16 @@ for variable in variable_set:
     plt.title(plot_title if plot_title else f"{variable.upper()} Comparison Across Folders")
     
     plt.legend()
-    plt.savefig(os.path.join(restart_comparison_path, latest_folder, f"{variable.upper()}_comparison.png"))
+    plt.savefig(os.path.join(restart_comparison_path, eval_case, f"{variable.upper()}_comparison.png"))
     plt.close()
 
     # Archive name will be the same as the folder, e.g., 191152.250802-121751_results.tar.gz
-    tar_name = f"{latest_folder}.tar.gz"
-    tar_path = os.path.join(restart_comparison_path, latest_folder, tar_name)
-    png_dir = os.path.join(restart_comparison_path, latest_folder)
+    #tar_name = f"{eval_case}.tar.gz"
+    #tar_path = os.path.join(restart_comparison_path, eval_case, tar_name)
+    #png_dir = os.path.join(restart_comparison_path, eval_case)
 
-    with tarfile.open(tar_path, "w:gz") as tar:
-        for fname in os.listdir(png_dir):
-            if fname.endswith(".png"):
-                tar.add(os.path.join(png_dir, fname), arcname=fname)
-    print(f"Created archive: {tar_path}")
+    #with tarfile.open(tar_path, "w:gz") as tar:
+    #    for fname in os.listdir(png_dir):
+    #        if fname.endswith(".png"):
+    #            tar.add(os.path.join(png_dir, fname), arcname=fname)
+    #print(f"Created archive: {tar_path}")
