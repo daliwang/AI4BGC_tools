@@ -14,15 +14,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # the path of the restart_comparison folder
-restart_comparison_path = "/gpfs/wolf2/cades/cli185/proj-shared/wangd/AI_data/JAMES_results/restart_comparison"
+restart_comparison_path = "/gpfs/wolf2/cades/cli185/proj-shared/wangd/AI_data/JAMES_results/restart_comparison/CNP_IO_short9"
 
 # get all the folders in the restart_comparison_path
-reference_folders = ["run_updated9_cnp", "run_model", "run_780"]
+reference_folders = ["Standard", "Proof-of-concept"]
 all_folders = [f for f in os.listdir(restart_comparison_path) if os.path.isdir(os.path.join(restart_comparison_path, f))]
 
 # Require the user to explicitly provide the evaluate case via CLI
 parser = argparse.ArgumentParser(description="Compare an explicit evaluate case against reference folders.")
-parser.add_argument("--eval-case", "--case", dest="eval_case", required=True,
+parser.add_argument("--eval-case", "--case", dest="eval_case", default="AI_spinup",
                     help="Name of the evaluate case folder under the restart_comparison path.")
 args = parser.parse_args()
 

@@ -5,7 +5,7 @@ import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import numpy as np
 import matplotlib.gridspec as gridspec
-from matplotlib.colors import TwoSlopeNorm, ListedColormap, BoundaryNorm
+from matplotlib.colors import TwoSlopeNorm
 import argparse
 import glob
 
@@ -43,58 +43,13 @@ def get_display_unit_and_scaled(data, var, ds):
     return weighted, display_unit
 
 
-def _percent_diff_categories(model_vals: np.ndarray, ai_vals: np.ndarray) -> np.ndarray:
-    """
-    Categorize percent differences between model and AI values into 6 bins with sign information.
-    
-    Args:
-        model_vals: Reference model values
-        ai_vals: AI/updated values
-        
-    Returns:
-        Categorized array with values:
-        -2: -25%+ (large negative difference)
-        -1: -10% to -25% (moderate negative difference)
-         0: -10% to +10% (no significant difference)
-        +1: +10% to +25% (moderate positive difference)
-        +2: +25%+ (large positive difference)
-    """
-    model = np.asarray(model_vals, dtype=float)
-    ai = np.asarray(ai_vals, dtype=float)
-    cat = np.full(model.shape, np.nan, dtype=float)
-    finite = np.isfinite(model) & np.isfinite(ai)
-    if not np.any(finite):
-        return cat
-    
-    # Threshold: zero-out percentage where |model| <= 10% of mean(|model|)
-    mean_abs_model = np.nanmean(np.abs(model[finite])) if np.any(finite) else 0.0
-    threshold = 0.1 * mean_abs_model
-    denom = np.abs(model[finite])
-    
-    # Compute percent (AI - model)/model in %
-    pct = (ai[finite] - model[finite]) / np.where(denom > 0, denom, 1.0) * 100.0
-    
-    # Apply threshold rule
-    pct[denom <= threshold] = 0.0
-    
-    # Categorize into 5 bins with sign information
-    bins = np.zeros_like(pct, dtype=int)
-    
-    # -2: -25%+, -1: -10% to -25%, 0: -10% to +10%, +1: +10% to +25%, +2: +25%+
-    bins[(pct < -25)] = -2
-    bins[(pct >= -25) & (pct < -10)] = -1
-    bins[(pct >= -10) & (pct <= 10)] = 0
-    bins[(pct > 10) & (pct <= 25)] = 1
-    bins[(pct > 25)] = 2
-    
-    cat[finite] = bins.astype(float)
-    return cat
+
 
 
 def plot_variable_comparison(var, data1, data2, lon, lat, label1, label2, save_path, unit1, unit2):
     diff = data1 - data2
-    fig = plt.figure(figsize=(12, 20))
-    gs = gridspec.GridSpec(4, 1, figure=fig, hspace=0.3)
+    fig = plt.figure(figsize=(12, 15))
+    gs = gridspec.GridSpec(3, 1, figure=fig, hspace=0.3)
     proj = ccrs.PlateCarree()
     vmin_1 = float(np.nanmin(data1))
     vmax_1 = float(np.nanmax(data1))
@@ -163,34 +118,6 @@ def plot_variable_comparison(var, data1, data2, lon, lat, label1, label2, save_p
     add_map_features(ax3, f'{var} - Difference ({label1} - {label2})')
     cbar3 = add_colorbar(im3, ax3, f'Δ{var}')
     
-    # Plot 4: Percent-difference categorical map with red/blue colors
-    ax4 = fig.add_subplot(gs[3, 0], projection=proj)
-    # Treat data2 as model, data1 as AI/updated
-    cat = _percent_diff_categories(data2, data1)
-    
-    # Define colors for the categorical map with red/blue scheme
-    colors = [
-        "#08519c",  # -2: -25%+ (dark blue - large negative difference)
-        "#6baed6",  # -1: -10% to -25% (light blue - moderate negative difference)
-        "#ffffff",  #  0: -10% to +10% (white - no significant difference)
-        "#fcbba1",  # +1: +10% to +25% (light red - moderate positive difference)
-        "#cb181d",  # +2: +25%+ (dark red - large positive difference)
-    ]
-    cmap = ListedColormap(colors)
-    boundaries = [-2.5, -1.5, -0.5, 0.5, 1.5, 2.5]
-    norm_cat = BoundaryNorm(boundaries, cmap.N)
-    
-    im4 = ax4.pcolormesh(lon, lat, cat, transform=proj, cmap=cmap, norm=norm_cat)
-    add_map_features(ax4, f'{var} - Percent Difference Categories')
-    
-    # Custom colorbar for categorical plot
-    cbar4 = plt.colorbar(im4, ax=ax4, shrink=0.7, pad=0.05, ticks=[-2, -1, 0, 1, 2])
-    cbar4.set_label('Difference Category', fontsize=12, fontweight='bold')
-    cbar4.ax.tick_params(labelsize=10)
-    cbar4.ax.set_yticklabels([
-        "-25%+", "-10% to -25%", "-10% to +10%", "+10% to +25%", "+25%+"
-    ])
-    
     # Ensure consistent layout and spacing
     plt.suptitle(f'Variable {var} Comparison Analysis', fontsize=18, fontweight='bold', y=0.96)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
@@ -206,7 +133,6 @@ def plot_variable_comparison(var, data1, data2, lon, lat, label1, label2, save_p
 def main():
     parser = argparse.ArgumentParser(description='Compare variables between NetCDF files.')
     parser.add_argument('--latest', type=str, default=None, help='Path to the latest result NetCDF file (file 1).')
-    parser.add_argument('--previous', type=str, default=None, help='Path to a previous result NetCDF file (file 2).')
     parser.add_argument('--model', type=str, default='model_780_h0_results.nc', help='Path to the model reference NetCDF file.')
     parser.add_argument('--search_pattern', type=str, default='./*.nc', help='Glob pattern to search for NetCDF files.')
     args = parser.parse_args()
@@ -215,30 +141,20 @@ def main():
     if args.latest is None:
         args.latest = get_latest_file(args.search_pattern)
         print(f"Auto-selected latest file: {args.latest}")
-    if args.previous is None:
-        nc_files = sorted(glob.glob(args.search_pattern))
-        prev_candidates = [f for f in nc_files if f != args.latest]
-        if not prev_candidates:
-            raise FileNotFoundError("No previous file found.")
-        args.previous = prev_candidates[-1]
-        print(f"Auto-selected previous file: {args.previous}")
+    
     model_file = args.model
     
     # Extract base names from file paths for folder names
     latest_basename = os.path.splitext(os.path.basename(args.latest))[0]
-    previous_basename = os.path.splitext(os.path.basename(args.previous))[0]
     model_basename = os.path.splitext(os.path.basename(model_file))[0]
     
-    # Output folders using file names
+    # Output folder using file names
     latest_model_dir = f'{latest_basename}_vs_{model_basename}'
-    latest_reference_dir = f'{latest_basename}_vs_{previous_basename}'
     
     os.makedirs(latest_model_dir, exist_ok=True)
-    os.makedirs(latest_reference_dir, exist_ok=True)
     
     # Open datasets
     ds_latest = xr.open_dataset(args.latest)
-    ds_prev = xr.open_dataset(args.previous)
     ds_model = xr.open_dataset(model_file)
     lon = ds_latest['lon']
     lat = ds_latest['lat']
@@ -264,22 +180,6 @@ def main():
             stats['unit1'] = unit_latest
             stats['unit2'] = unit_model
             all_stats.append(stats)
-            
-        if var not in ds_latest.data_vars or var not in ds_prev.data_vars:
-            print(f"Variable {var} not found in latest/previous, skipping...")
-        else:
-            v_latest = ds_latest[var]
-            v_prev = ds_prev[var]
-            data_latest = v_latest.isel(time=0).values if 'time' in v_latest.dims else v_latest.values
-            data_prev = v_prev.isel(time=0).values if 'time' in v_prev.dims else v_prev.values
-            data_latest_scaled, unit_latest = get_display_unit_and_scaled(data_latest, v_latest, ds_latest)
-            data_prev_scaled, unit_prev = get_display_unit_and_scaled(data_prev, v_prev, ds_prev)
-            save_path = os.path.join(latest_reference_dir, f'{var}_comparison.png')
-            stats = plot_variable_comparison(var, data_latest_scaled, data_prev_scaled, lon, lat, 'Latest', 'Previous', save_path, unit_latest, unit_prev)
-            stats['comparison_type'] = 'Latest vs Previous'
-            stats['unit1'] = unit_latest
-            stats['unit2'] = unit_prev
-            all_stats.append(stats)
     
     # Save summary statistics to CSV file
     import pandas as pd
@@ -289,10 +189,9 @@ def main():
     print(f"\nSummary statistics saved to: {summary_file}")
     
     ds_latest.close()
-    ds_prev.close()
     ds_model.close()
     print("\nAll variable comparison plots are complete!")
-    print(f"Images saved in: {latest_model_dir}/ and {latest_reference_dir}/")
+    print(f"Images saved in: {latest_model_dir}/")
     print(f"Summary file: {summary_file}")
 
 if __name__ == '__main__':
